@@ -4,6 +4,7 @@ const qs = require("qs");
 
 async function fetchTikTokData(videoUrl) {
   try {
+    // On essaie d'abord ssstik
     const body = qs.stringify({
       id: videoUrl,
       locale: "en",
@@ -14,16 +15,17 @@ async function fetchTikTokData(videoUrl) {
       headers: {
         accept: "*/*",
         "content-type": "application/x-www-form-urlencoded",
-        "user-agent": "Mozilla/5.0",
-        referer: "https://ssstik.io/en-1",
+        "user-agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        referer: "https://ssstik.io/en",
         "hx-request": "true",
         "hx-target": "target",
         "hx-trigger": "_gcaptcha_pt",
       },
+      timeout: 15000,
     });
 
-    const html = res.data;
-    const $ = cheerio.load(html);
+    const $ = cheerio.load(res.data);
 
     const title =
       $("#avatar_and_text h2").text().trim() ||
@@ -32,29 +34,27 @@ async function fetchTikTokData(videoUrl) {
 
     const thumbnail =
       $(".result_author").attr("src") ||
-      $("#mainpicture").css("background-image") ||
+      $("#mainpicture").attr("src") ||
       null;
 
     const downloads = [];
 
-    // VIDEO / AUDIO DOWNLOADS
-    $("a.download_link:not(.slide)").each((_, el) => {
+    $("a.download_link").each((_, el) => {
       const text = $(el).text().replace(/\s+/g, " ").trim();
-      const url = $(el).attr("href");
+      const href = $(el).attr("href");
 
-      if (!url || url === "#") return;
-
-      downloads.push({ text, url });
+      if (href && href !== "#" && href.startsWith("http")) {
+        downloads.push({
+          text: text || "Download",
+          url: href,
+        });
+      }
     });
 
-    // PHOTO / SLIDE DOWNLOADS
-    $("a.download_link.slide").each((_, el) => {
-      const url = $(el).attr("href");
-
-      if (!url || url === "#") return;
-
-      downloads.push({ url });
-    });
+    // Si aucun lien trouvé, on essaie une autre source
+    if (downloads.length === 0) {
+      throw new Error("Aucun lien trouvé via ssstik");
+    }
 
     return {
       status: true,
@@ -63,7 +63,8 @@ async function fetchTikTokData(videoUrl) {
       downloads,
     };
   } catch (error) {
-    throw new Error(`SSSTik request failed: ${error.message}`);
+    console.error("TikTok fetch failed:", error.message);
+    throw new Error(`Impossible de récupérer la vidéo TikTok : ${error.message}`);
   }
 }
 
