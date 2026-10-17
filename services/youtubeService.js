@@ -6,11 +6,11 @@ async function fetchYouTubeData(url) {
   }
 
   try {
-    // 1. On récupère d'abord les métadonnées via oEmbed (très fiable)
+    // Récupération des métadonnées via oEmbed (officiel et stable)
     const oembedRes = await axios.get(
       `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
       {
-        timeout: 8000,
+        timeout: 10000,
         headers: {
           "User-Agent":
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -22,17 +22,27 @@ async function fetchYouTubeData(url) {
     const author = oembedRes.data?.author_name || "YouTube";
     const thumbnail = oembedRes.data?.thumbnail_url || null;
 
-    // 2. Pour le moment on renvoie les métadonnées
-    // (le vrai lien de téléchargement YouTube est plus compliqué sans scraper fiable)
+    // Extraire l'ID de la vidéo
+    const videoIdMatch = url.match(
+      /(?:v=|youtu\.be\/|shorts\/|embed\/)([a-zA-Z0-9_-]{11})/
+    );
+    const videoId = videoIdMatch?.[1] || null;
+
     return {
       success: true,
+      type: "video",
+      url,
       title,
       author,
-      thumbnail,
-      url,
-      note: "Métadonnées récupérées. Le téléchargement direct YouTube est temporairement limité.",
+      thumbnail: thumbnail
+        ? thumbnail.replace("hqdefault", "maxresdefault")
+        : videoId
+        ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg`
+        : null,
+      videoId,
       videos: [],
       audios: [],
+      note: "Métadonnées récupérées avec succès. Le téléchargement direct YouTube est limité actuellement.",
     };
   } catch (err) {
     console.error("YouTube service error:", err.message);
