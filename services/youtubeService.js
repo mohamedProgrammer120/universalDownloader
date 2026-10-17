@@ -6,54 +6,37 @@ async function fetchYouTubeData(url) {
   }
 
   try {
-    // Méthode alternative plus fiable (utilise un autre endpoint public)
-    const { data } = await axios.get("https://api.cobalt.tools/", {
-      params: { url },
-      headers: {
-        Accept: "application/json",
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      },
-      timeout: 15000,
-      validateStatus: () => true,
-    });
-
-    // Si cobalt répond bien
-    if (data && (data.status === "tunnel" || data.status === "redirect" || data.status === "stream")) {
-      return {
-        type: "video",
-        url,
-        title: data.filename || "YouTube Video",
-        thumbnail: null,
-        videos: [
-          {
-            quality: "best",
-            url: data.url,
-            format: "mp4",
-          },
-        ],
-        audios: [],
-      };
-    }
-
-    // Fallback : essayer une autre source
-    const oembed = await axios.get(
+    // 1. On récupère d'abord les métadonnées via oEmbed (très fiable)
+    const oembedRes = await axios.get(
       `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`,
-      { timeout: 8000 }
+      {
+        timeout: 8000,
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        },
+      }
     );
 
+    const title = oembedRes.data?.title || "YouTube Video";
+    const author = oembedRes.data?.author_name || "YouTube";
+    const thumbnail = oembedRes.data?.thumbnail_url || null;
+
+    // 2. Pour le moment on renvoie les métadonnées
+    // (le vrai lien de téléchargement YouTube est plus compliqué sans scraper fiable)
     return {
-      type: "video",
+      success: true,
+      title,
+      author,
+      thumbnail,
       url,
-      title: oembed.data?.title || "YouTube Video",
-      thumbnail: oembed.data?.thumbnail_url || null,
+      note: "Métadonnées récupérées. Le téléchargement direct YouTube est temporairement limité.",
       videos: [],
       audios: [],
-      note: "Metadata only - download link unavailable with current sources",
     };
   } catch (err) {
-    console.error("YouTube fetch failed:", err.message);
-    throw new Error("Impossible de récupérer la vidéo YouTube actuellement");
+    console.error("YouTube service error:", err.message);
+    throw new Error("Impossible de récupérer les informations de cette vidéo YouTube");
   }
 }
 
